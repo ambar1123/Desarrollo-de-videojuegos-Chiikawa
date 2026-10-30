@@ -3,11 +3,79 @@
   const SEC = 960;
   const H = 540;
 
+  /* ===== SONIDOS ===== */
+  const SOUNDS = {
+    menu:  { file: "audio/menu.mp3",     volume: 0.4, loop: true }, 
+    music: { file: "audio/musica.mp3",   volume: 0.4, loop: true }, 
+    jump:  { file: "audio/salto.mp3",    volume: 0.6 },             
+    coin:  { file: "audio/moneda.mp3",   volume: 0.6 },             
+    win:   { file: "audio/victoria.mp3", volume: 0.7 },             
+    click: { file: "audio/click.mp3",    volume: 0.5 }            
+  };
+
+  const audioCache = {};
+  let soundMuted = false;
+
+  function getAudio(name) {
+    if (!audioCache[name]) {
+      const cfg = SOUNDS[name];
+      const audio = new Audio(cfg.file);
+      audio.loop = !!cfg.loop;
+      audio.volume = cfg.volume;
+      audio.muted = soundMuted;
+      audioCache[name] = audio;
+    }
+
+    return audioCache[name];
+  }
+
+  let currentLoop = null;
+  window.GameAudio = {
+    play(name) {
+      const audio = getAudio(name);
+      audio.currentTime = 0;
+      audio.play().catch(() => {}); 
+    },
+
+    loop(name) {
+      if (currentLoop === name && !getAudio(name).paused) return;
+
+      this.stopLoops();
+      currentLoop = name;
+      getAudio(name).play().catch(() => {});
+    },
+
+    stopLoops() {
+      Object.keys(SOUNDS).forEach((name) => {
+        if (SOUNDS[name].loop && audioCache[name]) {
+          audioCache[name].pause();
+          audioCache[name].currentTime = 0;
+        }
+      });
+      currentLoop = null;
+    },
+    toggleMute() {
+      soundMuted = !soundMuted;
+      Object.values(audioCache).forEach((audio) => { audio.muted = soundMuted; });
+      return soundMuted;
+    }
+  };
+
+  /* ===== EFECTOS DE SONIDO ===== */
+  const SFX_VOLUME = 0.7;
+  const SFX_FILES = {
+    jump: "audio/salto.mp3",     
+    coin: "audio/moneda.mp3",    
+    win: "audio/final.mp3"       
+  };
+
   const characterImages = {
     chiikawa: "imagenes/chiikawa.png",
     hachiware: "imagenes/hachiware.png",
     usagi: "imagenes/usagi.png"
   };
+
+  //Cosas a modificar
 
   const characterStats = {
     chiikawa: { speed: 4.5, jump: 13 },    // Equilibrado
@@ -17,6 +85,8 @@
 
   const SPRITE = 85;
   const HB = { offX: 18, w: 49, h: 76 };
+
+  //cosa a modificar de la gravedad
   const GRAVITY = 0.6;
   const STEP = 1000 / 60;
 
@@ -24,10 +94,14 @@
   const VILLAIN_SIZE = 70;
 
   const rooms = {
+
     /* ================== NIVEL PRINCIPAL ================== */
+
     main: {
       sections: [
+
         /* ===== SECCIÓN 1 · INICIO ===== */
+
         {
           name: "SECCIÓN 1 · INICIO",
           clouds: [{ x: 90, y: 400 }, { x: 640, y: 440, small: true }],
@@ -55,9 +129,7 @@
           ],
           block: { x: 130, y: 335, w: 56, h: 56 },
           coins: [{ x: 650, y: 280 }],
-          // TUBO DE ENTRADA: párate encima y presiona ↓
           pipes: [{ x: 810, w: 80, top: 200, solid: true, pipeTo: "secret" }],
-          // VILLANO 1: patrulla entre la plataforma y la tubería
           villains: [
             { id: "villano1", img: "imagenes/kimera.png", y: 120, min: 625, max: 735, speed: 1.2 }
           ]
@@ -77,13 +149,12 @@
           platforms: [{ x: 455, w: 165, top: 320 }],
           coins: [{ x: 517, y: 362 }],
           pipes: [
-            // Tubería decorativa incrustada en la pared de tierra
             { x: 790, w: 100, top: 165, bottom: 20, solid: false },
-            // TUBO DE SALIDA: aquí aparece el personaje al salir de la sala secreta
             { x: 680, w: 80, top: 270, solid: true, exit: true }
           ],
-          // VILLANO 2: patrulla en el bloque del medio
           villains: [
+            //Villano a modificar
+
             { id: "villano2", img: "imagenes/chiibaku.png", y: 130, min: 385, max: 474, speed: 1.4 }
           ],
           flag: { x: 800, base: 200, height: 280 }
@@ -104,7 +175,6 @@
             { x: 420, y: 135 }, { x: 480, y: 135 },
             { x: 565, y: 275 }, { x: 615, y: 275 }, { x: 665, y: 275 }
           ],
-          // Tubo de salida: párate encima y presiona ↓
           pipes: [{ x: 830, w: 80, top: 190, solid: true, pipeTo: "main" }]
         }
       ]
@@ -128,8 +198,6 @@
   let villains = [];
   let flagZone = null;
   let totalCoins = 0;
-
-  // Lo que se conserva al entrar y salir de la sala secreta
   let progress = { collected: new Set(), blocks: new Set(), defeated: new Set() };
 
   let px, py, vy, camX;
@@ -318,7 +386,6 @@
           alive: true
         };
 
-        // Si el PNG no existe todavía, se muestra un monstruito de emergencia
         el.addEventListener("error", () => {
           const fallback = document.createElement("div");
           fallback.className = "game-villain game-villain-fallback";
@@ -341,7 +408,6 @@
       }
     });
 
-    // Personaje (al final para que quede encima)
     player = document.createElement("img");
     player.src = characterImages[window.SELECTED_CHARACTER] || characterImages.chiikawa;
     player.alt = window.SELECTED_CHARACTER || "chiikawa";
@@ -359,6 +425,11 @@
     }
 
     keys[event.key] = true;
+
+    if (event.key.toLowerCase() === "m") {
+      const muted = window.GameAudio.toggleMute();
+      showMessage(muted ? "SONIDO: NO" : "SONIDO: SÍ", 900);
+    }
 
     if (event.key.toLowerCase() === "r") {
       window.startChiikawaGame();
@@ -396,6 +467,7 @@
 
     block.used = true;
     progress.blocks.add(block.id);
+    window.GameAudio.play("coin");
     coins++;
     updateCounter();
     block.el.classList.add("used", "bump");
@@ -414,6 +486,8 @@
 
   function win() {
     finished = true;
+    window.GameAudio.stopLoops();
+    window.GameAudio.play("win");
     showMessage(
       "¡NIVEL COMPLETADO!<br>" +
         "MONEDAS: " + coins + " / " + totalCoins +
@@ -485,6 +559,7 @@
       if (isDown("ArrowUp", " ", "w", "W") && onGround) {
         vy = stats.jump;
         onGround = false;
+        window.GameAudio.play("jump");
       }
 
       /* Movimiento vertical */
@@ -591,6 +666,7 @@
           c.collected = true;
           progress.collected.add(c.id);
           c.el.style.display = "none";
+          window.GameAudio.play("coin");
           coins++;
           updateCounter();
         }
@@ -684,6 +760,7 @@
 
     buildLevel("main");
     updateCounter();
+    window.GameAudio.loop("music");
 
     px = START.x;
     py = START.y;
@@ -695,6 +772,8 @@
 
     backButton.addEventListener("click", () => {
       stopGame();
+      window.GameAudio.play("click");
+      window.GameAudio.loop("menu");
       keys = {};
       player = null;
 
