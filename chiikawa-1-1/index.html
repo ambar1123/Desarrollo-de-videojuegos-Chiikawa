@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -101,14 +100,15 @@
     <div id="game" class="game-canvas hidden"></div>
 
     <p class="controls-hint">
-      ← → / A D para moverte · ESPACIO / ↑ para saltar · R para reiniciar
+      ← → / A D para moverte · ESPACIO / ↑ para saltar · ↓ para entrar a tubos · R para reiniciar · M sonido
     </p>
 
   </main>
 
+  <!-- game.js crea window.GameAudio (todos los sonidos), por eso va primero -->
   <script src="game.js"></script>
 
- 
+
 <script>
   const startScreen = document.getElementById("start-screen");
   const characterScreen = document.getElementById("character-screen");
@@ -124,7 +124,30 @@
   let chosenCharacter = "chiikawa";
   let focusedButton = 1;
 
+  /* ---------- Sonidos de los menús ---------- */
+  // Atajo: reproduce un efecto (si game.js ya cargó)
+  function sfx(name) {
+    if (window.GameAudio) window.GameAudio.play(name);
+  }
+
+  // Los navegadores no dejan sonar nada hasta que la persona haga clic
+  // o presione una tecla. En la primera interacción arranca la música del menú.
+  function unlockAudio() {
+    document.removeEventListener("pointerdown", unlockAudio);
+    document.removeEventListener("keydown", unlockAudio);
+
+    if (window.GameAudio && gameContainer.classList.contains("hidden")) {
+      window.GameAudio.loop("menu");
+    }
+  }
+
+  document.addEventListener("pointerdown", unlockAudio);
+  document.addEventListener("keydown", unlockAudio);
+
+  /* ---------- Pantallas ---------- */
   function openCharacterScreen() {
+    sfx("click");
+
     startScreen.classList.add("hidden");
     characterScreen.classList.remove("hidden");
 
@@ -157,12 +180,15 @@
   }
 
   function startGame() {
+    sfx("click");
+
     window.SELECTED_CHARACTER = chosenCharacter;
 
     startScreen.classList.add("hidden");
     characterScreen.classList.add("hidden");
     gameContainer.classList.remove("hidden");
 
+    // startChiikawaGame() también cambia la música del menú por la del nivel
     if (typeof window.startChiikawaGame === "function") {
       window.startChiikawaGame();
     } else {
@@ -173,6 +199,8 @@
   }
 
   function goBack() {
+    sfx("click");
+
     characterScreen.classList.add("hidden");
     startScreen.classList.remove("hidden");
     newGameButton.focus();
@@ -186,6 +214,7 @@
 
   characterCards.forEach((card) => {
     card.addEventListener("click", () => {
+      sfx("click");
       chosenCharacter = card.dataset.character;
       updateCharacterSelection();
     });
@@ -200,6 +229,12 @@
     }
 
     const key = event.key;
+
+    // M: silenciar / activar el sonido en los menús
+    if (key.toLowerCase() === "m" && window.GameAudio) {
+      window.GameAudio.toggleMute();
+      return;
+    }
 
     if (
       ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter"]
@@ -217,7 +252,7 @@
       return;
     }
 
-    
+    // SELECCIÓN DE PERSONAJES
     if (charactersVisible) {
       if (key === "ArrowLeft" || key === "ArrowRight") {
         const currentIndex = characterCards.findIndex(
@@ -230,12 +265,14 @@
           (currentIndex + direction + characterCards.length) %
           characterCards.length;
 
+        sfx("click");
         chosenCharacter = characterCards[nextIndex].dataset.character;
         updateCharacterSelection();
       }
 
-      
+      // Cambiar entre VOLVER y JUGAR
       if (key === "ArrowUp" || key === "ArrowDown") {
+        sfx("click");
         focusedButton = focusedButton === 0 ? 1 : 0;
         updateButtonFocus();
       }
